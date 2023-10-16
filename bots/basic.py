@@ -29,28 +29,32 @@ class CommandMapper(ABC):
 class BotEventHandler(EventHandler):
 
     def __init__(self,
-                 as_user: Keys,
+                 keys: Keys,
                  clients: ClientPool,
-                 kind: int = Event.KIND_TEXT_NOTE,
-                 encrypt: bool = None,
+                 # default is to reply both to standard notes and nip 4 dms
+                 kinds: [int] = [Event.KIND_TEXT_NOTE, Event.KIND_ENCRYPT],
+                 # the encrypted kinds
+                 encrypt_kinds: [int] = [Event.KIND_ENCRYPT],
                  inbox: Keys = None,
                  event_acceptors: [EventAccepter] = None,
                  command_map: CommandMapper = None):
 
         # keys the bot will use to recieve and send events
-        self._as_user = as_user
+        self._keys = keys
 
         # the relays we're watching for events from and writing to
         # (can be a pool with different relays for reading to writing)
         self._clients = clients
 
-        # the event kind we'll use to recieve message - and probably to write also default kind 1 text notes
-        self._kind = kind
+        # the event kind/s we'll use to recieve message - and probably to write also default kind 1 text notes
+        if isinstance(kinds, list):
+            kinds = set(kinds)
+        self._kinds = kinds
 
         # will we encrypt messages, default is only True for Event.KIND_ENCRYPT (NIP4) events
-        self._encrypt = encrypt
-        if self._encrypt is None and self._kind == Event.KIND_ENCRYPT:
-            self._encrypt = True
+        if isinstance(encrypt_kinds, list):
+            encrypt_kinds = set(encrypt_kinds)
+        self._encrypt_kinds = encrypt_kinds
 
         # public inbox to use - not implemented yet
         self._inbox = inbox
@@ -79,9 +83,9 @@ class BotEventHandler(EventHandler):
     def do_event(self, client: Client, sub_id, evt: Event):
         # replying to ourself would be bad! also call accept_event
         # to stop us replying mutiple times if we see the same event from different relays
-        if evt.pub_key == self._as_user.public_key_hex() or \
+        if evt.pub_key == self._keys.public_key_hex() or \
                 self.accept_event(client, sub_id, evt) is False \
-                or evt.kind != self._kind:
+                or evt.kind not in self._kinds:
             return
 
         logging.debug(f'BotEventHandler::do_event - received event {evt}')
@@ -108,22 +112,22 @@ class BotEventHandler(EventHandler):
         # TODO - add inbox unwrapping if required here
 
         # decrypt if required
-        if self._encrypt:
+        if evt.kind in self._encrypt_kinds:
             ret = Event.decrypt_nip4(evt=evt,
-                                     keys=self._as_user,
+                                     keys=self._keys,
                                      check_kind=False)
         return ret
 
-    def make_response_event(self, evt: Event) -> Event:
+    def make_response_event(self, repsonse_evt: Event, prompt_evt: Event) -> Event:
         # should be the adding whatever we strip off during get cmd event
-        ret = evt
+        ret = repsonse_evt
         # TODO - add inbox wrapping if required here
 
-        # decrypt if required
-        if self._encrypt:
-            ret = Event.decrypt_nip4(evt=evt,
-                                     keys=self._as_user,
-                                     check_kind=False)
+        # encrypt if required
+        if repsonse_evt.kind in self._encrypt_kinds:
+            ret.content = ret.encrypt_content(self._keys.private_key_hex(),
+                                              pub_key=prompt_evt.pub_key)
+
         return ret
 
     async def ado_response_event(self, client: Client, sub_id, evt: Event) -> Event:
@@ -134,7 +138,7 @@ class BotEventHandler(EventHandler):
             response_evt = await self.make_response_cmd_map(client, sub_id, evt)
 
         # we have the response - this just encrypts/wraps for sending
-        response_evt = self.make_response_event(response_evt)
+        response_evt = self.make_response_event(response_evt, evt)
 
         # and actually send
         self.send_response(response_evt)
@@ -142,10 +146,11 @@ class BotEventHandler(EventHandler):
     def get_reply_event(self, prompt_evt: Event):
         # gets an empty reply event ready for us to set content - may also add tags
         return Event(
-            kind=self._kind,
+            # reply will be same kind that we recieved on
+            kind=prompt_evt.kind,
             content='',
             tags=BotEventHandler.reply_tags(prompt_evt),
-            pub_key=self._as_user.public_key_hex(),
+            pub_key=self._keys.public_key_hex(),
             created_at=util_funcs.date_as_ticks(datetime.now())
         )
 
@@ -174,12 +179,12 @@ class BotEventHandler(EventHandler):
                     'error': f'command not understood - {cmd}'
                 })
             else:
-                response_text = await self._command_map.do_command(cmd, args)
+                response_text = json.dumps(await self._command_map.do_command(cmd, args))
 
         ret = self.get_reply_event(evt)
         ret.content = response_text
         return ret
 
     def send_response(self, response_evt: Event):
-        response_evt.sign(self._as_user.private_key_hex())
+        response_evt.sign(self._keys.private_key_hex())
         self._clients.publish(response_evt)

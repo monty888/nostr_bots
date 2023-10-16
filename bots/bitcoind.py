@@ -11,7 +11,7 @@ from monstr.encrypt import Keys
 from bots.basic import BotEventHandler, CommandMapper
 
 
-class Bitcoind_rpc:
+class BitcoindRPC:
 
     def __init__(self,
                  url: str,
@@ -36,10 +36,11 @@ class Bitcoind_rpc:
                         }),
                         auth=aiohttp.BasicAuth(self._user, self._password)
                 ) as resp:
-                    if resp.status != 200:
+                    if resp.status == 200:
+                        ret = json.loads(await resp.text())
+                    else:
+                        raise Exception(f'Bitcoind_rpc:: execute_cmd failed method- {method} params - {params} status {resp.status}')
                         logging.debug(f'Bitcoind_rpc:: execute_cmd failed method- {method} params - {params} status {resp.status}')
-
-                    ret = json.loads(await resp.text())
 
         except Exception as e:
             ret = {
@@ -55,9 +56,9 @@ class Bitcoind_rpc:
         return await self._execute_cmd('listtransactions',{})
 
 
-class Bitcoind_CommandMapper(CommandMapper, ABC):
+class BitcoindCommandMapper(CommandMapper, ABC):
 
-    def __init__(self, bitcoind: Bitcoind_rpc):
+    def __init__(self, bitcoind: BitcoindRPC):
         self._rpc = bitcoind
         super().__init__({
             'getnewaddress': self.getnewaddress,
@@ -78,24 +79,29 @@ class Bitcoind_CommandMapper(CommandMapper, ABC):
         pass
 
 
-class Bitcoind_Bot(BotEventHandler):
+class BitcoindBot(BotEventHandler):
 
     def __init__(self,
-                 as_user: Keys,
+                 keys: Keys,
                  clients: ClientPool,
-                 bitcoin_rpc: Bitcoind_rpc,
-                 kind: int = Event.KIND_TEXT_NOTE,
-                 encrypt: bool = None,
+                 bitcoin_rpc: BitcoindRPC,
+                 kind: int = 20888,
                  inbox: Keys = None,
                  event_acceptors: [EventAccepter] = None):
 
         self._rpc = bitcoin_rpc
 
-        super().__init__(as_user=as_user,
+        self._kind = kind
+
+        super().__init__(keys=keys,
                          clients=clients,
-                         kind=kind,
-                         encrypt=encrypt,
+                         kinds=[kind],
+                         encrypt_kinds=[kind],
                          inbox=inbox,
                          event_acceptors=event_acceptors,
-                         command_map=Bitcoind_CommandMapper(bitcoin_rpc))
+                         command_map=BitcoindCommandMapper(bitcoin_rpc))
+
+    @property
+    def kind(self):
+        return self._kind
 
