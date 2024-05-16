@@ -30,3 +30,8 @@ Executes commands against a local bitcoin node and sends the replies over nostr.
 ```sh
 python run_ip_bot.py
 ```
+
+# todo
+
+- [ ] relay needs to be parsed from command line at least plus other options
+- [ ] min basic commands for the bitcoin bot + simple web interface?
