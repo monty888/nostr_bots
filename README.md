@@ -11,7 +11,7 @@ source venv/bin/activate
 pip install .
 ```
 
-[!Note]  
+> [!Note]  
 Won't work with current pip of monstr get current version from https://github.com/monty888/monstr
 until updated
 
