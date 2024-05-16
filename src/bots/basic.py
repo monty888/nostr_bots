@@ -7,6 +7,7 @@ from monstr.client.client import Client, ClientPool
 from monstr.client.event_handlers import EventHandler, DeduplicateAcceptor, EventAccepter
 from monstr.event.event import Event
 from monstr.encrypt import Keys
+from monstr.inbox import Inbox
 from monstr.util import util_funcs
 
 
@@ -20,6 +21,7 @@ class CommandMapper(ABC):
 
     @abstractmethod
     def is_cmd_auth(self, name, pub_k: str) -> bool:
+        # TODO - this or similar allows us to restrict certain commands
         pass
 
     async def do_command(self, name: str, args: []) -> dict:
@@ -35,7 +37,7 @@ class BotEventHandler(EventHandler):
                  kinds: [int] = [Event.KIND_TEXT_NOTE, Event.KIND_ENCRYPT],
                  # the encrypted kinds
                  encrypt_kinds: [int] = [Event.KIND_ENCRYPT],
-                 inbox: Keys = None,
+                 inbox: Inbox = None,
                  event_acceptors: [EventAccepter] = None,
                  command_map: CommandMapper = None):
 
@@ -81,6 +83,10 @@ class BotEventHandler(EventHandler):
         ]
 
     def do_event(self, client: Client, sub_id, evt: Event):
+        if self._inbox:
+            evt = self._inbox.unwrap_event(evt=evt,
+                                           keys=self._keys)
+
         # replying to ourself would be bad! also call accept_event
         # to stop us replying mutiple times if we see the same event from different relays
         if evt.pub_key == self._keys.public_key_hex() or \
@@ -159,9 +165,6 @@ class BotEventHandler(EventHandler):
         ret.content = 'BotEventHandler:: No CommandMapper? You should implement make_response in your bot'
         return ret
 
-    def parse_command_event(self, evt):
-        pass
-
     async def make_response_cmd_map(self, the_client: Client, sub_id, evt: Event) -> Event:
         cmd_text = evt.content
         cmd_split = cmd_text.split()
@@ -187,4 +190,21 @@ class BotEventHandler(EventHandler):
 
     def send_response(self, response_evt: Event):
         response_evt.sign(self._keys.private_key_hex())
+
+        # wrap the response event
+        if self._inbox:
+            response_evt = self._inbox.wrap_event(response_evt)
+
+            # response_evt = Event(kind=Event.KIND_ENCRYPT,
+            #                      content=json.dumps(response_evt.event_data()),
+            #                      pub_key=self._inbox.view_key)
+            #
+            # response_evt.content = response_evt.encrypt_content(self._inbox.decrypt_key, self._inbox.view_key)
+
+            response_evt.sign(self._inbox.decrypt_key)
+
         self._clients.publish(response_evt)
+
+    @property
+    def inbox(self) -> Inbox:
+        return self._inbox

@@ -4,12 +4,11 @@ Some simple bots for nostr in python.
 # install
 
 ```sh
-git clone --recurse-submodules https://github.com/monty888/bots.git  
+git clone https://github.com/monty888/bots.git  
 cd bots  
 python3 -m venv venv   
-source venv/bin/activate   
-#pip install -r requirements.txt   
-pip install ./monstr
+source venv/bin/activate      
+pip install .
 ```
 
 # echo_bot

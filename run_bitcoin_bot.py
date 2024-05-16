@@ -9,7 +9,8 @@ from monstr.client.client import Client, ClientPool
 from monstr.util import util_funcs
 from monstr.encrypt import Keys
 from bots.bitcoind import BitcoindBot, BitcoindRPC
-from util import load_toml
+from src.bots.util import load_toml
+from bots.acceptors import AuthListAccept
 
 
 # working directory
@@ -27,7 +28,7 @@ BITCOIND_USER = 'monty'              #
 BITCOIND_PASSWORD = 'Fl09q6kMFioOKyICCtXY5CJ082aawgS4SrIGFC7yxGE'
 
 # default bitcoind config
-BITCOIND_WALLET = 'test'
+BITCOIND_WALLET = 'cormorant'
 BITCOIND_HOST = 'http://localhost'
 BITCOIND_PORT = 8332
 # BITCOIND_PORT = 18332
@@ -79,17 +80,39 @@ async def run_bot(args):
 
     # actually create the client pool
     def on_connect(the_client: Client):
-        print('try connect', bot.kind)
+        watch_filter = {
+             'kinds': [bot.kind],
+             '#p': [keys.public_key_hex()],
+             'since': util_funcs.date_as_ticks(datetime.now())
+        }
+        if bot.inbox:
+            watch_filter = {
+                'kinds': [bot.inbox.kind],
+                'authors': [bot.inbox.view_key],
+                'since': util_funcs.date_as_ticks(datetime.now())
+            }
+        print(watch_filter)
         the_client.subscribe(sub_id='bot_watch',
                              handlers=[bot],
-                             filters={
-                                 'kinds': [bot.kind],
-                                 '#p': [keys.public_key_hex()],
-                                 'since': util_funcs.date_as_ticks(datetime.now())
-                             })
+                             filters=watch_filter)
 
     clients = ClientPool(clients=relays.split(','),
                          on_connect=on_connect)
+
+    # accept request from these keys - this could come from file/config
+    # or even from monitoring a nostr list event
+    my_accept = AuthListAccept([
+        '5c4bf3e548683d61fb72be5f48c2dff0cf51901b9dd98ee8db178efe522e325f'
+    ])
+
+
+    inbox = None
+    # need to get cmd
+    # inbox = Inbox(keys=Keys.get_key('nsec1g6exndqqcrmwxrkhkn0d4xer9hvr3nmnd8umm4kf2ml7vrqvgl7qyccx5k'),
+    #               use_kind=20888)
+    # inbox.set_share_map(for_keys=keys,
+    #                     to_keys=[Keys.get_key('npub1t39l8e2gdq7kr7mjhe053skl7r84ryqmnhvca6xmz780u53wxf0swj0fey')])
+
 
     # actually create the bot
     bot = BitcoindBot(keys=keys,
@@ -98,7 +121,9 @@ async def run_bot(args):
                           url=bitcoin_url,
                           user=bitcoin_user,
                           password=bitcoin_password
-                      ))
+                      ),
+                      inbox=inbox,
+                      event_acceptors=[my_accept])
 
     # start the clients
     print(f'monitoring for events from or to account {keys.public_key_hex()} on relays {relays}')

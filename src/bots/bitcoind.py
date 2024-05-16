@@ -49,11 +49,20 @@ class BitcoindRPC:
 
         return ret
 
+    async def getbalances(self):
+        return await self._execute_cmd('getbalances', {})
+
     async def getnewaddress(self):
         return await self._execute_cmd('getnewaddress',{})
 
     async def listtransactions(self):
         return await self._execute_cmd('listtransactions',{})
+
+    async def listunspent(self):
+        return await self._execute_cmd('listunspent',{})
+
+    async def sendrawtransaction(self, hexstring: str):
+        return await self._execute_cmd('sendrawtransaction', [hexstring])
 
 
 class BitcoindCommandMapper(CommandMapper, ABC):
@@ -61,13 +70,18 @@ class BitcoindCommandMapper(CommandMapper, ABC):
     def __init__(self, bitcoind: BitcoindRPC):
         self._rpc = bitcoind
         super().__init__({
+            'getbalances': self.getbalances,
             'getnewaddress': self.getnewaddress,
             'listtransactions': self.listtransactions,
-            'claim': self.claim
+            'listunspent': self.listunspent,
+            'sendrawtransaction' : self.sendrawtransaction
         })
 
     def is_cmd_auth(self, name, pub_k: str) -> bool:
         return True
+
+    async def getbalances(self, args):
+        return await self._rpc.getbalances()
 
     async def getnewaddress(self, args):
         return await self._rpc.getnewaddress()
@@ -75,8 +89,11 @@ class BitcoindCommandMapper(CommandMapper, ABC):
     async def listtransactions(self, args):
         return await self._rpc.listtransactions()
 
-    async def claim(self):
-        pass
+    async def listunspent(self, args):
+        return await self._rpc.listunspent()
+
+    async def sendrawtransaction(self, args):
+        return await self._rpc.sendrawtransaction(args[0])
 
 
 class BitcoindBot(BotEventHandler):

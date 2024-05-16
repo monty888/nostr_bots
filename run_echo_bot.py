@@ -8,6 +8,7 @@ from monstr.client.client import Client, ClientPool
 from monstr.event.event import Event
 from monstr.util import util_funcs
 from monstr.encrypt import Keys
+from monstr.inbox import Inbox
 from bots.basic import BotEventHandler
 
 
@@ -48,27 +49,37 @@ async def run_bot(args):
     relays = args['relays']
 
     # kinds will reply to
-    kind = Event.KIND_TEXT_NOTE
+    kinds = [Event.KIND_TEXT_NOTE, Event.KIND_ENCRYPT]
+
+    # test inbox
+    inbox_k = Keys()
+    print(inbox_k.private_key_bech32())
+    # Note with an ibox you need to know who will contact you (that is provide view keys)
+    # my_box = Inbox(keys=inbox_k)
+    my_box = None
+
 
     # actually create the client pool
     def on_connect(the_client: Client):
         the_client.subscribe(sub_id='bot_watch',
                              handlers=[bot],
                              filters={
-                                 'kinds': [kind],
-                                 '#p': [keys.public_key_hex()],
+                                 'kinds': kinds,
                                  'since': util_funcs.date_as_ticks(datetime.now())
                              })
 
     clients = ClientPool(clients=relays.split(','),
                          on_connect=on_connect)
 
+
+
     # actually create the bot
     bot = EchoBot(keys=keys,
-                  clients=clients)
+                  clients=clients,
+                  inbox=my_box)
 
     # start the clients
-    print(f'monitoring for events from or to account {keys.public_key_hex()} on relays {relays}')
+    print(f'monitoring for events from or to account {keys.public_key_bech32()} on relays {relays}')
     def sigint_handler(signal, frame):
         clients.end()
         sys.exit(0)
