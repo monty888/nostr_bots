@@ -10,6 +10,7 @@ from monstr.util import util_funcs
 from monstr.encrypt import Keys
 from monstr.inbox import Inbox
 from bots.basic import BotEventHandler
+from monstr.signing import BasicKeySigner
 
 
 # default relay
@@ -21,7 +22,7 @@ USE_KEY = 'nsec1fnyygyh57chwf7zhw3mwmrltc2hatfwn0hldtl4z5axv4netkjlsy0u220'
 class EchoBot(BotEventHandler):
 
     async def make_response(self, client: Client, sub_id, evt: Event) -> Event:
-        ret = self.get_reply_event(evt)
+        ret = await self.get_reply_event(evt)
         ret.content = evt.content
         return ret
 
@@ -74,7 +75,7 @@ async def run_bot(args):
 
 
     # actually create the bot
-    bot = EchoBot(keys=keys,
+    bot = EchoBot(signer=BasicKeySigner(keys),
                   clients=clients,
                   inbox=my_box)
 

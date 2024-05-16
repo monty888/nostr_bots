@@ -8,6 +8,7 @@ from monstr.client.client import Client, ClientPool
 from monstr.event.event import Event
 from monstr.util import util_funcs
 from monstr.encrypt import Keys
+from monstr.signing import BasicKeySigner
 from bots.basic import BotEventHandler
 
 
@@ -20,7 +21,7 @@ USE_KEY = 'nsec1fnyygyh57chwf7zhw3mwmrltc2hatfwn0hldtl4z5axv4netkjlsy0u220'
 class IPBot(BotEventHandler):
 
     async def make_response(self, client: Client, sub_id, evt: Event) -> Event:
-        ret = self.get_reply_event(evt)
+        ret = await self.get_reply_event(evt)
 
         # any shell method to get ip will do us, we'll use curl - hopefully it exists
         proc = await asyncio.create_subprocess_exec(
@@ -74,7 +75,7 @@ async def run_bot(args):
                          on_connect=on_connect)
 
     # actually create the bot
-    bot = IPBot(keys=keys,
+    bot = IPBot(signer=BasicKeySigner(keys),
                 clients=clients,
                 encrypt_kinds=[])
 

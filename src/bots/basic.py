@@ -5,8 +5,8 @@ from datetime import datetime
 from abc import ABC, abstractmethod
 from monstr.client.client import Client, ClientPool
 from monstr.client.event_handlers import EventHandler, DeduplicateAcceptor, EventAccepter
+from monstr.signing import SignerInterface
 from monstr.event.event import Event
-from monstr.encrypt import Keys
 from monstr.inbox import Inbox
 from monstr.util import util_funcs
 
@@ -31,30 +31,35 @@ class CommandMapper(ABC):
 class BotEventHandler(EventHandler):
 
     def __init__(self,
-                 keys: Keys,
+                 signer: SignerInterface,
                  clients: ClientPool,
                  # default is to reply both to standard notes and nip 4 dms
-                 kinds: [int] = [Event.KIND_TEXT_NOTE, Event.KIND_ENCRYPT],
+                 kinds: [int] = None,
                  # the encrypted kinds
-                 encrypt_kinds: [int] = [Event.KIND_ENCRYPT],
+                 encrypt_kinds: [int] = None,
                  inbox: Inbox = None,
                  event_acceptors: [EventAccepter] = None,
                  command_map: CommandMapper = None):
 
-        # keys the bot will use to recieve and send events
-        self._keys = keys
+        # used to sign and encrypt events
+        self._signer = signer
 
         # the relays we're watching for events from and writing to
         # (can be a pool with different relays for reading to writing)
         self._clients = clients
 
+        # if not given default is to reply both to plaintext and nip4 encrypted events
+        if kinds is None:
+            kinds = [Event.KIND_TEXT_NOTE, Event.KIND_ENCRYPT]
         # the event kind/s we'll use to recieve message - and probably to write also default kind 1 text notes
-        if isinstance(kinds, list):
+        elif isinstance(kinds, list):
             kinds = set(kinds)
         self._kinds = kinds
 
-        # will we encrypt messages, default is only True for Event.KIND_ENCRYPT (NIP4) events
-        if isinstance(encrypt_kinds, list):
+        # events that'll be treated as nip4 encryped, default is just Event.KIND_ENCRYPT(4)
+        if encrypt_kinds is None:
+            encrypt_kinds = [Event.KIND_ENCRYPT]
+        elif isinstance(encrypt_kinds, list):
             encrypt_kinds = set(encrypt_kinds)
         self._encrypt_kinds = encrypt_kinds
 
@@ -83,60 +88,27 @@ class BotEventHandler(EventHandler):
         ]
 
     def do_event(self, client: Client, sub_id, evt: Event):
+        # move into async, probably put in q here
+        asyncio.create_task(self.ado_response_event(client=client,
+                                                    sub_id=sub_id,
+                                                    evt=evt))
+
+    async def ado_response_event(self, client: Client, sub_id, evt: Event) -> Event:
+        # if inbox unwrap
         if self._inbox:
-            evt = self._inbox.unwrap_event(evt=evt,
-                                           keys=self._keys)
+            evt = await self._inbox.unwrap_event(evt=evt,
+                                                 user_sign=self._signer)
 
         # replying to ourself would be bad! also call accept_event
         # to stop us replying mutiple times if we see the same event from different relays
-        if evt.pub_key == self._keys.public_key_hex() or \
+        if evt.pub_key == await self._signer.get_public_key() or \
                 self.accept_event(client, sub_id, evt) is False \
                 or evt.kind not in self._kinds:
-            return
-
-        logging.debug(f'BotEventHandler::do_event - received event {evt}')
-
-        # authorisation can just be done via event_acceptor??
-        # is this a key we reply to?
-        # if not self.authorise(evt):
-        #     return
+            return None
 
         # decode/unwrap or whatever to get the actual event with the cmd in it
-        req_event = self.get_request_event(evt)
+        evt = await self.get_request_event(evt)
 
-        # fire of the task that actually create a response and send it
-        asyncio.create_task(self.ado_response_event(client=client,
-                                                    sub_id=sub_id,
-                                                    evt=req_event))
-
-    # def authorise(self, evt: Event) -> bool:
-    #     # auth check on basic event, do we even bother responding to this user?
-    #     return True
-
-    def get_request_event(self, evt: Event) -> Event:
-        ret = evt
-        # TODO - add inbox unwrapping if required here
-
-        # decrypt if required
-        if evt.kind in self._encrypt_kinds:
-            ret = Event.decrypt_nip4(evt=evt,
-                                     keys=self._keys,
-                                     check_kind=False)
-        return ret
-
-    def make_response_event(self, repsonse_evt: Event, prompt_evt: Event) -> Event:
-        # should be the adding whatever we strip off during get cmd event
-        ret = repsonse_evt
-        # TODO - add inbox wrapping if required here
-
-        # encrypt if required
-        if repsonse_evt.kind in self._encrypt_kinds:
-            ret.content = ret.encrypt_content(self._keys.private_key_hex(),
-                                              pub_key=prompt_evt.pub_key)
-
-        return ret
-
-    async def ado_response_event(self, client: Client, sub_id, evt: Event) -> Event:
         # NOTE at this point is the decrypted and unwrapped event (if that was required)
         if self._command_map is None:
             response_evt = await self.make_response(client, sub_id, evt)
@@ -144,24 +116,53 @@ class BotEventHandler(EventHandler):
             response_evt = await self.make_response_cmd_map(client, sub_id, evt)
 
         # we have the response - this just encrypts/wraps for sending
-        response_evt = self.make_response_event(response_evt, evt)
+        response_evt = await self.make_response_event(response_evt, evt)
 
         # and actually send
-        self.send_response(response_evt)
+        await self.send_response(response_evt)
 
-    def get_reply_event(self, prompt_evt: Event):
+        return response_evt
+
+    # def authorise(self, evt: Event) -> bool:
+    #     # auth check on basic event, do we even bother responding to this user?
+    #     return True
+
+    async def get_request_event(self, evt: Event) -> Event:
+        ret = evt
+        # TODO - add inbox unwrapping if required here
+
+        # decrypt if required
+        if evt.kind in self._encrypt_kinds:
+            ret = await self._signer.nip4_decrypt_event(evt)
+
+        return ret
+
+    async def make_response_event(self, response_evt: Event, prompt_evt: Event) -> Event:
+        # should be the adding whatever we strip off during get cmd event
+        ret = response_evt
+        # TODO - add inbox wrapping if required here
+
+        # encrypt if required
+        if response_evt.kind in self._encrypt_kinds:
+            ret = await self._signer.nip4_encrypt_event(evt=response_evt,
+                                                        to_pub_k=prompt_evt.pub_key)
+
+
+        return ret
+
+    async def get_reply_event(self, prompt_evt: Event):
         # gets an empty reply event ready for us to set content - may also add tags
         return Event(
             # reply will be same kind that we recieved on
             kind=prompt_evt.kind,
             content='',
             tags=BotEventHandler.reply_tags(prompt_evt),
-            pub_key=self._keys.public_key_hex(),
+            pub_key=await self._signer.get_public_key(),
             created_at=util_funcs.date_as_ticks(datetime.now())
         )
 
     async def make_response(self, client: Client, sub_id, evt: Event) -> Event:
-        ret = self.get_reply_event(evt)
+        ret = await self.get_reply_event(evt)
         ret.content = 'BotEventHandler:: No CommandMapper? You should implement make_response in your bot'
         return ret
 
@@ -184,24 +185,17 @@ class BotEventHandler(EventHandler):
             else:
                 response_text = json.dumps(await self._command_map.do_command(cmd, args))
 
-        ret = self.get_reply_event(evt)
+        ret = await self.get_reply_event(evt)
         ret.content = response_text
         return ret
 
-    def send_response(self, response_evt: Event):
-        response_evt.sign(self._keys.private_key_hex())
+    async def send_response(self, response_evt: Event):
+        await self._signer.sign_event(response_evt)
 
         # wrap the response event
         if self._inbox:
-            response_evt = self._inbox.wrap_event(response_evt)
-
-            # response_evt = Event(kind=Event.KIND_ENCRYPT,
-            #                      content=json.dumps(response_evt.event_data()),
-            #                      pub_key=self._inbox.view_key)
-            #
-            # response_evt.content = response_evt.encrypt_content(self._inbox.decrypt_key, self._inbox.view_key)
-
-            response_evt.sign(self._inbox.decrypt_key)
+            response_evt = await self._inbox.wrap_event(evt=response_evt,
+                                                        from_sign=self._signer)
 
         self._clients.publish(response_evt)
 

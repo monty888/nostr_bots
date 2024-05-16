@@ -1,13 +1,12 @@
 import logging
 import json
 from abc import ABC
-import asyncio
 import aiohttp
 from aiohttp import ClientSession
-from monstr.client.client import Client, ClientPool
+from monstr.client.client import ClientPool
+from monstr.signing import SignerInterface
+from monstr.inbox import Inbox
 from monstr.client.event_handlers import EventAccepter
-from monstr.event.event import Event
-from monstr.encrypt import Keys
 from bots.basic import BotEventHandler, CommandMapper
 
 
@@ -40,7 +39,7 @@ class BitcoindRPC:
                         ret = json.loads(await resp.text())
                     else:
                         raise Exception(f'Bitcoind_rpc:: execute_cmd failed method- {method} params - {params} status {resp.status}')
-                        logging.debug(f'Bitcoind_rpc:: execute_cmd failed method- {method} params - {params} status {resp.status}')
+                        # logging.debug(f'Bitcoind_rpc:: execute_cmd failed method- {method} params - {params} status {resp.status}')
 
         except Exception as e:
             ret = {
@@ -99,18 +98,18 @@ class BitcoindCommandMapper(CommandMapper, ABC):
 class BitcoindBot(BotEventHandler):
 
     def __init__(self,
-                 keys: Keys,
+                 signer: SignerInterface,
                  clients: ClientPool,
                  bitcoin_rpc: BitcoindRPC,
                  kind: int = 20888,
-                 inbox: Keys = None,
+                 inbox: Inbox = None,
                  event_acceptors: [EventAccepter] = None):
 
         self._rpc = bitcoin_rpc
 
         self._kind = kind
 
-        super().__init__(keys=keys,
+        super().__init__(signer=signer,
                          clients=clients,
                          kinds=[kind],
                          encrypt_kinds=[kind],

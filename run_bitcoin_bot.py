@@ -8,6 +8,7 @@ from monstr.exception import ConfigurationError
 from monstr.client.client import Client, ClientPool
 from monstr.util import util_funcs
 from monstr.encrypt import Keys
+from monstr.signing import BasicKeySigner
 from bots.bitcoind import BitcoindBot, BitcoindRPC
 from src.bots.util import load_toml
 from bots.acceptors import AuthListAccept
@@ -88,7 +89,7 @@ async def run_bot(args):
         if bot.inbox:
             watch_filter = {
                 'kinds': [bot.inbox.kind],
-                'authors': [bot.inbox.view_key],
+                'authors': [bot.inbox.pub_key],
                 'since': util_funcs.date_as_ticks(datetime.now())
             }
         print(watch_filter)
@@ -115,7 +116,7 @@ async def run_bot(args):
 
 
     # actually create the bot
-    bot = BitcoindBot(keys=keys,
+    bot = BitcoindBot(signer=BasicKeySigner(keys),
                       clients=clients,
                       bitcoin_rpc=BitcoindRPC(
                           url=bitcoin_url,

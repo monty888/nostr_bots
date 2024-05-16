@@ -4,12 +4,17 @@ Some simple bots for nostr in python.
 # install
 
 ```sh
-git clone https://github.com/monty888/bots.git  
-cd bots  
+git clone https://github.com/monty888/nostr_bots.git  
+cd nostr_bots  
 python3 -m venv venv   
 source venv/bin/activate      
 pip install .
 ```
+
+[!Note]  
+Won't work with current pip of monstr get current version from https://github.com/monty888/monstr
+until updated
+
 
 # echo bot
 Replies with the same text that it receives.
@@ -33,5 +38,7 @@ python run_ip_bot.py
 
 # todo
 
+- [ ] get the inbox code working
+- [ ] add support for nip44 encryption and not just nip4
 - [ ] relay needs to be parsed from command line at least plus other options
 - [ ] min basic commands for the bitcoin bot + simple web interface?
