@@ -9,7 +9,7 @@ from monstr.event.event import Event
 from monstr.util import util_funcs
 from monstr.encrypt import Keys
 from monstr.signing import BasicKeySigner
-from bots.basic import BotEventHandler
+from nostr_bots.basic import BotEventHandler
 
 
 # default relay
@@ -80,7 +80,7 @@ async def run_bot(args):
                 encrypt_kinds=[])
 
     # start the clients
-    print(f'monitoring for events from or to account {keys.public_key_hex()} on relays {relays}')
+    print(f'monitoring for events from or to account {keys.public_key_bech32()} on relays {relays}')
 
     def sigint_handler(signal, frame):
         clients.end()

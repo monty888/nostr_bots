@@ -9,7 +9,7 @@ from monstr.event.event import Event
 from monstr.util import util_funcs
 from monstr.encrypt import Keys
 from monstr.inbox import Inbox
-from bots.basic import BotEventHandler
+from nostr_bots.basic import BotEventHandler
 from monstr.signing import BasicKeySigner
 
 

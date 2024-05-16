@@ -3,6 +3,7 @@ Some simple bots for nostr in python.
 
 # install
 
+from github
 ```sh
 git clone https://github.com/monty888/nostr_bots.git  
 cd nostr_bots  
@@ -11,9 +12,16 @@ source venv/bin/activate
 pip install .
 ```
 
+using pip
+```sh
+pip install nostr_bots
+```
+
 > [!Note]  
 Won't work with current pip of monstr get current version from https://github.com/monty888/monstr
-until updated
+until updated  
+> [!Note]
+when install via pip to run use python -m nostr_bots.__name__ e.g python -m nostr_bots.run_echo_bot 
 
 
 # echo bot

@@ -9,9 +9,9 @@ from monstr.client.client import Client, ClientPool
 from monstr.util import util_funcs
 from monstr.encrypt import Keys
 from monstr.signing import BasicKeySigner
-from bots.bitcoind import BitcoindBot, BitcoindRPC
-from src.bots.util import load_toml
-from bots.acceptors import AuthListAccept
+from nostr_bots.bitcoind import BitcoindBot, BitcoindRPC
+from src.nostr_bots.util import load_toml
+from nostr_bots.acceptors import AuthListAccept
 
 
 # working directory

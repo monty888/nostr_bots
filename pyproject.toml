@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bots"
+name = "nostr_bots"
 dynamic = ["version"]
-description = ''
+description = "simple bots for nostr using monstr"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -26,12 +26,12 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/monty/bots#readme"
-Issues = "https://github.com/monty/bots/issues"
-Source = "https://github.com/monty/bots"
+Documentation = "https://github.com/monty/nostr_bots#readme"
+Issues = "https://github.com/monty/nostr_bots/issues"
+Source = "https://github.com/monty/nostr_bots"
 
 [tool.hatch.version]
-path = "src/bots/__about__.py"
+path = "src/nostr_bots/__about__.py"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
@@ -58,3 +58,6 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nostr_bots"]
