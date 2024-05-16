@@ -26,9 +26,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/monty/nostr_bots#readme"
-Issues = "https://github.com/monty/nostr_bots/issues"
-Source = "https://github.com/monty/nostr_bots"
+Documentation = "https://github.com/monty888/nostr_bots#readme"
+Issues = "https://github.com/monty888/nostr_bots/issues"
+Source = "https://github.com/monty888/nostr_bots"
 
 [tool.hatch.version]
 path = "src/nostr_bots/__about__.py"
