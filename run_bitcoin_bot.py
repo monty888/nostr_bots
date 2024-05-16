@@ -25,8 +25,9 @@ USE_KEY = 'nsec1fnyygyh57chwf7zhw3mwmrltc2hatfwn0hldtl4z5axv4netkjlsy0u220'
 
 # for connecting to bitcoind
 BITCOIND_NETWORK = 'test'            #   not yet used have to manually change port
-BITCOIND_USER = 'monty'              #
-BITCOIND_PASSWORD = 'Fl09q6kMFioOKyICCtXY5CJ082aawgS4SrIGFC7yxGE'
+# probably better this comes from the toml file....
+BITCOIND_USER = None
+BITCOIND_PASSWORD = None
 
 # default bitcoind config
 BITCOIND_WALLET = 'cormorant'
